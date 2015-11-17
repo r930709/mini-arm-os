@@ -2,68 +2,66 @@
 #include <stdint.h>
 #include "reg.h"
 #include "threads.h"
+#include "io.h"
+#include "str.h"
+#include "shell.h"
 
-/* USART TXE Flag
- * This flag is cleared when data is written to USARTx_DR and
- * set when that data is transferred to the TDR
- */
-#define USART_FLAG_TXE	((uint16_t) 0x0080)
-
-void usart_init(void)
+static void clear_input(char input_byte[],int index)
 {
-	*(RCC_APB2ENR) |= (uint32_t) (0x00000001 | 0x00000004);
-	*(RCC_APB1ENR) |= (uint32_t) (0x00020000);
 
-	/* USART2 Configuration, Rx->PA3, Tx->PA2 */
-	*(GPIOA_CRL) = 0x00004B00;
-	*(GPIOA_CRH) = 0x44444444;
-	*(GPIOA_ODR) = 0x00000000;
-	*(GPIOA_BSRR) = 0x00000000;
-	*(GPIOA_BRR) = 0x00000000;
-
-	*(USART2_CR1) = 0x0000000C;
-	*(USART2_CR2) = 0x00000000;
-	*(USART2_CR3) = 0x00000000;
-	*(USART2_CR1) |= 0x2000;
+    while(index) {
+        input_byte[index--] = '\0';
+    }
 }
 
-void print_str(const char *str)
-{
-	while (*str) {
-		while (!(*(USART2_SR) & USART_FLAG_TXE));
-		*(USART2_DR) = (*str & 0xFF);
-		str++;
-	}
-}
 
-static void delay(volatile int count)
-{
-	count *= 50000;
-	while (count--);
-}
 
-static void busy_loop(void *str)
+void Shell_Task(void *userdata)
 {
-	while (1) {
-		print_str(str);
-		print_str(": Running...\n");
-		delay(1000);
-	}
-}
+    int index = 0;
+    char input_byte[128];
+    char *argv[20];
 
-void test1(void *userdata)
-{
-	busy_loop(userdata);
-}
+    while(1) {
+        print_str("sunny@mini-arm-os:~$");
+        index = 0;
+        while(1) {
 
-void test2(void *userdata)
-{
-	busy_loop(userdata);
-}
+            input_byte[index] = get_byte();
+            /* Detect user press "enter" or a new line character*/
+            if(input_byte[index] == '\r' || input_byte[index] == '\n') {
+                if(index != 0) {
+                    input_byte[++index] = '\0';
+                    /* Parse command,know argc and save input_byte to *argv[] */
+                    int n = parse_command(input_byte, argv);
+                    print_str("\n");
+                    /*Function pointer to point what command is matched*/
+                    cmdfunc *fptr = do_command(argv[0]);
+                    if(fptr != NULL) {
+                        fptr(n,argv);  /* Cmmand is doing now */
+                    } else {
+                        print_str("command not found!!");
+                    }
+                }
+                print_str("\n");
+                break;
+            }
+            /* Detect backspace */
+            else if(input_byte[index] == 8 || input_byte[index] == 127) {
+                if(index!=0) {
+                    print_str("\b");
+                    print_str(" ");
+                    print_str("\b");
+                    input_byte[index--] = '\0';
+                }
+            } else {
+                print_str(&input_byte[index++]);
 
-void test3(void *userdata)
-{
-	busy_loop(userdata);
+            }
+        }
+        clear_input(input_byte,index);
+    }
+
 }
 
 /* 72MHz */
@@ -74,25 +72,19 @@ void test3(void *userdata)
 
 int main(void)
 {
-	const char *str1 = "Task1", *str2 = "Task2", *str3 = "Task3";
+    const char *str1 = "Shell Task";
 
-	usart_init();
+    usart_init();
 
-	if (thread_create(test1, (void *) str1) == -1)
-		print_str("Thread 1 creation failed\r\n");
+    if (thread_create(Shell_Task, (void *) str1) == -1)
+        print_str("Shell Thread creation failed\r\n");
 
-	if (thread_create(test2, (void *) str2) == -1)
-		print_str("Thread 2 creation failed\r\n");
+    /* SysTick configuration */
+    *SYSTICK_LOAD = (CPU_CLOCK_HZ / TICK_RATE_HZ) - 1UL;
+    *SYSTICK_VAL = 0;
+    *SYSTICK_CTRL = 0x07;
 
-	if (thread_create(test3, (void *) str3) == -1)
-		print_str("Thread 3 creation failed\r\n");
+    thread_start();
 
-	/* SysTick configuration */
-	*SYSTICK_LOAD = (CPU_CLOCK_HZ / TICK_RATE_HZ) - 1UL;
-	*SYSTICK_VAL = 0;
-	*SYSTICK_CTRL = 0x07;
-
-	thread_start();
-
-	return 0;
+    return 0;
 }
