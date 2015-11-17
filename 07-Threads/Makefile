@@ -6,10 +6,14 @@ CFLAGS = -fno-common -ffreestanding -O0 -std=gnu99 \
 	 -mcpu=cortex-m3 -mthumb \
 	 -Wl,-Tos.ld -nostartfiles \
 
+fib.o: fib.s
+%.o: %.s
+	$(CC) -c $(CFLAGS) -o $@ $<
+
 TARGET = os.bin
 all: $(TARGET)
 
-$(TARGET): os.c startup.c malloc.c threads.c io.c str.c shell.c type.c
+$(TARGET): os.c startup.c malloc.c threads.c io.c str.c shell.c type.c fib.o
 	$(CC) $(CFLAGS) $^ -o os.elf
 	$(CROSS_COMPILE)objcopy -Obinary os.elf os.bin
 	$(CROSS_COMPILE)objdump -S os.elf > os.list

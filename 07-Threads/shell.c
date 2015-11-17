@@ -57,16 +57,28 @@ void help_command(int n,char *argv[])
     }
 
 }
+void Fib_Task(void *userdata)
+{
+
+    int number = (int)userdata;
+    char *result_str = malloc(4*sizeof(char));
+    int result = fibonacci(number);
+    result_str = itoa(result,result_str);
+    print_str(result_str);
+    free(result_str);
+    result_str = NULL;
+
+}
+
 
 void fib_command(int n,char *argv[])
 {
 
-    char *num_str = malloc(4*sizeof(char));
-    num_str = itoa(n,num_str);
-    print_str(argv[0]);
-    print_str("\n");
-    print_str(argv[1]);
-    print_str("\n");
-    print_str(num_str);
-    print_str("\n");
+    char *num_str = malloc(1*sizeof(char));
+    num_str = strtok(argv[1],"-n=\r\n");
+    int number = atoi(num_str);
+    if (thread_create(Fib_Task,(void *)number) == -1) {
+        print_str("Fib_Task creation failed\r\n");
+    }
+
 }
