@@ -6,6 +6,8 @@
 #include "type.h"
 #include "malloc.h"
 #include "threads.h"
+#include "filesystem.h"
+
 
 typedef struct cmdlist {
     const char *name;
@@ -15,15 +17,20 @@ typedef struct cmdlist {
 
 void help_command(int n,char *argv[]);
 void fib_command(int n,char *argv[]);
+void ls_command(int n,char *argv[]);
 extern int fibonacci(int x);
 
 /* Use gcc token concatentation */
 #define COMMAND(NAME,DETAIL) {.name=#NAME, .fptr=NAME ## _command, .detail=DETAIL}
 #define getNumberInArray(a) (sizeof(a)/sizeof(a[0]))
+char pwd[20] = "/romfs/";
+
 
 cmdlist cl[]= {
     COMMAND(help, "Show the manual of the command"),
     COMMAND(fib, "Compute the fibonacii number,Example $fib -n=[number]"),
+    COMMAND(ls, "List directory, Example $ls /romfs/")
+
 };
 
 int parse_command(char *str,char *argv[])
@@ -57,6 +64,27 @@ void help_command(int n,char *argv[])
     }
 
 }
+void ls_command(int n, char *argv[])
+{
+
+    int dir;
+
+    if(n == 1) {
+
+        dir = fs_opendir(pwd);
+
+    } else if(n == 2) {
+        dir = fs_opendir(argv[1]);
+
+    } else {
+        print_str(" Too many argument!\r\n");
+        return;
+    }
+
+    (void)dir;  //Use dir
+
+}
+
 void Fib_Task(void *userdata)
 {
 
